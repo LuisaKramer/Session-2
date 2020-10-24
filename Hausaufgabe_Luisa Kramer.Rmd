@@ -1,0 +1,115 @@
+---
+title: "Hausaufgabe 2. Sitzung Data Science / Luisa Kramer"
+output: 
+      html_document:
+          df_print: paged
+---   
+# Libraries und Daten laden
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+BX_Book_Ratings <- read_delim("BX-Book-Ratings.csv", 
+    ";", escape_double = FALSE, trim_ws = TRUE)
+BX_Books <- read_delim("BX-Books.csv", 
+    ";", escape_double = FALSE, trim_ws = TRUE)
+```
+
+# Säubern und Transformation der Daten
+
+# Neuer Dataframe "books" mit allen benötigten Spalten
+```{r}
+(books <- BX_Books %>%
+  select(ISBN, `Book-Title`,`Year-Of-Publication`,Publisher))
+```
+
+# Herausfiltern "ohne Angabe" der Verlage, den Buchdaten wird der Ratings-Datensatz hinzugefügt
+
+```{r}
+(ratings <- BX_Book_Ratings %>%
+left_join(books) %>%
+filter(!is.na(Publisher)))
+```
+
+
+# Aufgabe 1: Gibt es eine lineare Beziehung zwischen Anzahl Bücher pro Publisher und Anzahl der Ratings, die die Bücher eines Publishers erhalten?
+
+# Neuer Dataframe "numberbooks" mit der Anzahl der Titel der Publisher 
+```{r}
+(numberbooks <- books %>%
+  group_by(Publisher) %>%
+  summarise(AnzahlTitel = n()) %>%
+  arrange(desc(AnzahlTitel)))
+```
+
+# Neuer Dataframe nmbrbookspubl (NumberRatingsBooksPublisher), in dem die Anzahl der Bewertungen mit der Anzahl der Titeln vereint werden
+```{r}
+(nmbrbookspubl <- ratings %>%
+    group_by(Publisher) %>%
+    summarise(AnzahlBewertungen = n()) %>%
+    left_join(numberbooks) %>%
+    arrange(desc(AnzahlTitel)))
+```
+
+# Rein objektiv auf den ersten Blick betrachtet, bedeutet mehr Bücher der Publisher nicht = mehr Ratings. z.B.: Harlequin hat knapp 7500 Titel und ca. 25.000 Bewertungen - ein deutlich kleinerer Verlag wie Warner Brooks hat knapp 2700 Titel und für diese sogar mehr Bewertungen erhalten. 
+
+# Um für die Berechnung der Linearen Regression nur 2 Variablen zu haben, schreibe ich die beiden in einen neuen Dataframe "nmbrbooks"
+```{r}
+(nmbrbooks <- nmbrbookspubl %>%
+   select(AnzahlTitel, AnzahlBewertungen))
+```
+# Berechnung der Linearen Regression
+
+```{r}
+lm(nmbrbooks$AnzahlBewertungen ~ nmbrbooks$AnzahlTitel)
+```
+
+```{r}
+fit <- lm(nmbrbooks$AnzahlBewertungen ~ nmbrbooks$AnzahlTitel)
+```
+
+# Ausgabe des Diagramms 
+
+```{r}
+plot(nmbrbooks)
+abline(fit)
+```
+
+```{r}
+summary(fit)
+```
+# Ergebnis: Der R-Wert beträgt 0,76, in 76% der Fälle ist die Hypothese ("Je mehr Bücher in Publisher hat, desto mehr Bewertungen hat er") also wahr. 
+
+ 
+# Aufgabe 2: Haben ältere Bücher mehr Ratings, weil sie mehr Zeit haben, um Ratings zu sammeln? 
+
+# Neues Dataframe "oldbooks", in dem alle Datensätze ohne Jahresangabe und nach 2020 herausgefiltert wurden, und die Anzahl der Bewertungen je Titel angezeigt werden
+
+```{r}
+(oldbooks <- ratings %>%
+  filter(`Year-Of-Publication`> 0) %>%
+   filter(`Year-Of-Publication`< 2021) %>%
+  group_by(`Book-Title`, `Year-Of-Publication`) %>%
+  summarise(AnzahlRatings = n()) %>%
+  arrange(desc(AnzahlRatings)))
+```
+
+# Ergebnis 1: Publikationsjahr absteigend mit Anzahl der Bewertungen pro Jahr zeigt, dass ältere Bücher nicht mehr Ratings haben 
+```{r}
+(oldbooksergebnis1 <- oldbooks %>%
+  group_by(`Year-Of-Publication`) %>%
+  summarise(AnzahlRatings = n()) %>%
+  arrange(desc(`Year-Of-Publication`)))
+```
+
+# Ergebnis 2: Das Diagramm zeigt eine nicht lineare Kurve, ab ca. 1970 steigt das Bewertungsverhalten stark an, abhängig vom Erscheinungsjahr der Bücher. Die Hypothese kann nicht bestätigt werden. Je aktueller die Bücher, desto mehr Bewertungen haben sie. 
+
+```{r}
+oldbooksergebnis2 <- oldbooksergebnis1 %>%
+  filter(`Year-Of-Publication` > 1900)
+plot(oldbooksergebnis2)
+```
+
+
